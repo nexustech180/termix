@@ -1,0 +1,221 @@
+:root {
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --accent: #4f46e5;
+  --accent-text: #ffffff;
+  --grid: #e2e8f0;
+  --term-bg: #0b1020;
+  --term-text: #d1d5db;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --error: #dc2626;
+  --info: #6366f1;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1020;
+    --surface: #131a2e;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --border: #243049;
+    --accent: #818cf8;
+    --grid: #1e293b;
+    --term-bg: #070b16;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --error: #f87171;
+    --info: #a5b4fc;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+.conn { font-size: 0.85rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); }
+.conn.on { color: var(--ok); border-color: var(--ok); }
+.conn.off { color: var(--muted); }
+
+main { flex: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+.back {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 10px;
+  color: var(--text); text-decoration: none; font-size: 1.3rem;
+  border: 1px solid var(--border);
+}
+.back:hover { background: var(--bg); }
+
+/* ---------- Home: mode picker ---------- */
+.home h1 { font-size: 1.3rem; margin: 8px 0 16px; }
+.modes { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 640px) { .modes { grid-template-columns: minmax(0, 1fr); } }
+.mode-card {
+  display: block; text-decoration: none; color: var(--text);
+  background: var(--surface); border: 2px solid var(--border); border-radius: 18px;
+  padding: 14px; transition: border-color .15s, transform .15s;
+}
+.mode-card:hover, .mode-card:focus-visible { border-color: var(--accent); transform: translateY(-2px); outline: none; }
+.mode-card h2 { margin: 12px 4px 4px; font-size: 1.15rem; }
+.mode-card p { margin: 0 4px 4px; color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
+.mode-card code { color: var(--accent); font-weight: 600; }
+.thumb { display: block; width: 100%; height: auto; border-radius: 12px; }
+.thumb-bg { fill: var(--bg); }
+.home .hint { margin-top: 16px; }
+
+/* ---------- Mode views ---------- */
+.terminal-view {
+  display: grid; gap: 16px; align-items: start;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+@media (max-width: 800px) { .terminal-view { grid-template-columns: minmax(0, 1fr); } }
+.remote-view { max-width: 980px; margin: 0 auto; }
+.center { text-align: center; }
+
+/* ---------- Terminal ---------- */
+.terminal {
+  background: var(--term-bg);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  height: min(70vh, 560px);
+  overflow: hidden;
+  font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
+}
+.log {
+  flex: 1; overflow-y: auto;
+  padding: 14px 16px;
+  color: var(--term-text);
+  font-size: 0.92rem; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+}
+.line.echo { color: #ffffff; font-weight: 600; margin-top: 6px; }
+.line.muted { color: #8b95a7; }
+.line.info { color: #a5b4fc; }
+.line.robot { color: #67e8f9; }
+.line.ok { color: #4ade80; }
+.line.warn { color: #fbbf24; }
+.line.error { color: #f87171; }
+
+.prompt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #1f2937;
+}
+.caret { color: #4ade80; font-weight: 700; }
+.prompt input {
+  flex: 1; min-width: 0;
+  background: transparent; border: 0; outline: none;
+  color: #ffffff; font: inherit; font-size: 1.05rem;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.prompt input::placeholder { color: #4b5563; }
+
+/* ---------- Path preview ---------- */
+.panel, .card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.panel h2 { margin: 0 0 10px; font-size: 1rem; }
+.muted { color: var(--muted); font-size: 0.8rem; }
+/* ---------- Remote control ---------- */
+.controller {
+  display: block; margin: 8px auto 4px;
+  width: min(100%, calc((100svh - 170px) * 1.96));
+  overflow: visible;   /* let the drop shadow spill past the edges */
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+.controller .hit { fill: transparent; pointer-events: all; cursor: pointer; }
+.controller .press { fill: #000; opacity: 0; pointer-events: none; transition: opacity .06s; }
+.controller .pad.active .press { opacity: 0.42; }
+.controller .pad[data-dir="S"].active .press { opacity: 0.35; }
+.controller .speed-btn.active .press { fill: #000; opacity: 0.4; }
+.link-led { fill: #7f1d1d; }
+.link-led.on { fill: #4ade80; filter: drop-shadow(0 0 6px #4ade80); }
+.speed-leds rect { fill: transparent; }
+.speed-leds rect.on { fill: #38bdf8; filter: drop-shadow(0 0 4px #38bdf8); }
+.remote-msg { min-height: 1.4em; margin: 4px 0; color: var(--warn); font-weight: 600; font-size: 0.95rem; }
+
+/* Phone held sideways: compact header, no help text, controller fills the screen. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .topbar { padding: 4px 12px; }
+  .topbar .btn { padding: 6px 10px; }
+  main { padding: 4px 12px; }
+  .footer { display: none; }
+  .remote-view .muted { display: none; }
+  .controller { width: min(100%, calc((100svh - 60px) * 1.96)); margin: 0 auto; }
+  .remote-msg { position: fixed; left: 0; right: 0; bottom: 6px; margin: 0; pointer-events: none; }
+  .terminal { height: calc(100svh - 80px); }
+}
+
+/* Controller on a phone held upright (screen lock not available): the app rotates the
+   whole page 90° so it appears in landscape. JS sets --rot-w / --rot-h and the class. */
+html.rotated, html.rotated body { overflow: hidden; }
+html.rotated body {
+  position: fixed; top: 0; left: 0;
+  width: var(--rot-w); height: var(--rot-h); min-height: 0;
+  transform-origin: top left;
+  transform: rotate(90deg) translateY(-100%);
+}
+html.rotated .topbar { padding: 4px 12px; }
+html.rotated .topbar .btn { padding: 6px 10px; }
+html.rotated main { padding: 4px 12px; }
+html.rotated .footer, html.rotated .remote-view .muted { display: none; }
+html.rotated .controller { width: min(100%, calc((var(--rot-h) - 60px) * 1.96)); margin: 0 auto; }
+html.rotated .remote-msg { position: fixed; left: 0; right: 0; bottom: 6px; margin: 0; pointer-events: none; }
+
+/* Phone upright: shorter terminal so the path preview is visible too. */
+@media (max-width: 600px) and (orientation: portrait) {
+  .terminal { height: 52svh; }
+}
+
+#pathCanvas { width: 100%; aspect-ratio: 1; display: block; }
+
+.hint { border-color: var(--accent); font-size: 0.9rem; line-height: 1.5; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  background: var(--accent); color: var(--accent-text);
+  border: 0; border-radius: 10px;
+  padding: 8px 14px; font: inherit; font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn.danger { background: var(--error); color: #fff; }
+
+.update-bar {
+  position: fixed; left: 16px; right: 16px; bottom: 16px;
+  max-width: 480px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--text); color: var(--bg);
+  padding: 12px 16px; border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+[hidden] { display: none !important; }
+
+.footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 12px; }

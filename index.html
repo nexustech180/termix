@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Temix</title>
+  <meta name="description" content="Temix - drive your robot with commands like FFFRFFFLLBB.">
+  <meta name="theme-color" content="#0b1020">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="favicon-64.png" sizes="64x64" type="image/png">
+  <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+
+  <!-- iPhone / iPad home-screen support -->
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Temix">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a id="backBtn" class="back" href="#" aria-label="Back to modes" hidden>←</a>
+      <img src="icon-192.png" alt="" width="32" height="32">
+      <span id="viewTitle">Temix</span>
+    </div>
+    <div class="actions">
+      <span id="connStatus" class="conn off">Not connected</span>
+      <button id="btConnect" class="btn">Bluetooth</button>
+      <button id="usbConnect" class="btn">USB</button>
+      <button id="disconnectBtn" class="btn ghost" hidden>Disconnect</button>
+      <button id="installBtn" class="btn ghost" hidden>Install app</button>
+    </div>
+  </header>
+
+  <main id="app">
+    <!-- ===== Home: pick a mode ===== -->
+    <section id="homeView" class="view home">
+      <h1>Choose a mode</h1>
+      <div class="modes">
+        <a class="mode-card" href="#terminal">
+          <svg class="thumb" viewBox="0 0 240 150" aria-hidden="true">
+            <rect width="240" height="150" rx="12" fill="#0b1020"/>
+            <circle cx="16" cy="14" r="4" fill="#f87171"/><circle cx="30" cy="14" r="4" fill="#fbbf24"/><circle cx="44" cy="14" r="4" fill="#4ade80"/>
+            <text x="16" y="48" fill="#4ade80" font-family="monospace" font-size="15" font-weight="700">&gt;</text>
+            <text x="30" y="48" fill="#ffffff" font-family="monospace" font-size="15" font-weight="700">FFFRFFFLLBB</text>
+            <text x="16" y="72" fill="#a5b4fc" font-family="monospace" font-size="11">forward 3 m → right 90°</text>
+            <text x="16" y="90" fill="#67e8f9" font-family="monospace" font-size="11">robot: STEP forward 3 m</text>
+            <text x="16" y="108" fill="#4ade80" font-family="monospace" font-size="11">robot: DONE</text>
+            <polyline points="180,130 180,100 215,100" fill="none" stroke="#818cf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <h2>Terminal</h2>
+          <p>Type a route like <code>FFFRFFFLLBB</code> and the robot drives it. Shows a path preview.</p>
+        </a>
+
+        <a class="mode-card" href="#remote">
+          <svg class="thumb" viewBox="-40 -44 880 550" aria-hidden="true">
+            <rect x="-40" y="-44" width="880" height="550" rx="44" class="thumb-bg"/>
+            <use href="#ctrl-art"/>
+          </svg>
+          <h2>Remote control</h2>
+          <p>Hold the arrow buttons to drive the robot live. Let go to stop.</p>
+        </a>
+      </div>
+
+      <!-- Shown on iPhone, which has no install button - users add it manually -->
+      <section id="iosHint" class="card hint" hidden>
+        <strong>Install on iPhone:</strong> tap <strong>Share</strong> in Safari, then <strong>Add to Home Screen</strong>.
+        Note: iPhones can't connect to HC-05/HC-06 Bluetooth modules. Use an Android phone or a PC to drive the robot.
+      </section>
+    </section>
+
+    <!-- ===== Terminal mode ===== -->
+    <section id="terminalView" class="view terminal-view" hidden>
+      <section class="terminal" aria-label="Terminal">
+        <div id="log" class="log" role="log" aria-live="polite"></div>
+        <form id="prompt" class="prompt" autocomplete="off">
+          <span class="caret">&gt;</span>
+          <input id="cmdInput" type="text" spellcheck="false" autocapitalize="characters"
+                 placeholder="FFFRFFFLLBB" aria-label="Command">
+          <button type="submit" class="btn">Run</button>
+          <button type="button" id="stopBtn" class="btn danger">Stop</button>
+        </form>
+      </section>
+
+      <section class="panel preview">
+        <div class="panel-head">
+          <h2>Path preview</h2>
+          <span class="muted">1 grid square = 1 m · ▲ = start</span>
+        </div>
+        <canvas id="pathCanvas" width="600" height="600"></canvas>
+      </section>
+    </section>
+
+    <!-- ===== Remote control mode ===== -->
+    <section id="remoteView" class="view remote-view" hidden>
+      <svg class="controller" viewBox="0 28 800 408" aria-label="Remote controller">
+        <use href="#ctrl-art"/>
+
+        <!-- Link light: green when connected -->
+        <circle id="linkLed" class="link-led" cx="400" cy="140" r="6"/>
+
+        <!-- Speed lights -->
+        <g id="speedLeds" class="speed-leds">
+          <rect x="344" y="190" width="16" height="8" rx="3"/>
+          <rect x="368" y="190" width="16" height="8" rx="3"/>
+          <rect x="392" y="190" width="16" height="8" rx="3"/>
+          <rect x="416" y="190" width="16" height="8" rx="3"/>
+          <rect x="440" y="190" width="16" height="8" rx="3"/>
+        </g>
+
+        <!-- Speed - / + -->
+        <g class="speed-btn" data-step="-1" role="button" aria-label="Slower">
+          <rect class="press" x="318" y="220" width="56" height="24" rx="12"/>
+          <rect class="hit" x="306" y="208" width="80" height="48"/>
+        </g>
+        <g class="speed-btn" data-step="1" role="button" aria-label="Faster">
+          <rect class="press" x="426" y="220" width="56" height="24" rx="12"/>
+          <rect class="hit" x="414" y="208" width="80" height="48"/>
+        </g>
+
+        <!-- D-pad: each arm has a big wedge-shaped touch area and a pressed shadow -->
+        <g class="pad" data-dir="F" role="button" aria-label="Forward">
+          <rect class="press" x="185" y="108" width="60" height="54" rx="6"/>
+          <path class="hit" d="M215 190 L137.2 112.2 A110 110 0 0 1 292.8 112.2 Z"/>
+        </g>
+        <g class="pad" data-dir="R" role="button" aria-label="Spin right">
+          <rect class="press" x="243" y="160" width="54" height="60" rx="6"/>
+          <path class="hit" d="M215 190 L292.8 112.2 A110 110 0 0 1 292.8 267.8 Z"/>
+        </g>
+        <g class="pad" data-dir="B" role="button" aria-label="Backward">
+          <rect class="press" x="185" y="218" width="60" height="54" rx="6"/>
+          <path class="hit" d="M215 190 L292.8 267.8 A110 110 0 0 1 137.2 267.8 Z"/>
+        </g>
+        <g class="pad" data-dir="L" role="button" aria-label="Spin left">
+          <rect class="press" x="133" y="160" width="54" height="60" rx="6"/>
+          <path class="hit" d="M215 190 L137.2 267.8 A110 110 0 0 1 137.2 112.2 Z"/>
+        </g>
+
+        <!-- STOP -->
+        <g class="pad" data-dir="S" role="button" aria-label="Stop">
+          <circle class="press" cx="585" cy="190" r="52"/>
+          <circle class="hit" cx="585" cy="190" r="72"/>
+        </g>
+      </svg>
+      <p id="remoteMsg" class="remote-msg center" role="status" aria-live="polite"></p>
+      <p class="muted center">Hold the D-pad to drive, let go to stop. PC: arrow keys / WASD, Space = stop, +/− = speed.</p>
+      
+    </section>
+  </main>
+
+  <!-- Shared controller artwork: used by the remote screen and the home thumbnail.
+       Kept in an always-rendered (0x0) SVG so gradients work when a view is hidden. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#4b515e"/>
+        <stop offset="0.45" stop-color="#2b2f38"/>
+        <stop offset="1" stop-color="#15171c"/>
+      </linearGradient>
+      <linearGradient id="gSheen" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+        <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.04"/>
+        <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="gBumper" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3a3f4a"/>
+        <stop offset="1" stop-color="#1a1c22"/>
+      </linearGradient>
+      <radialGradient id="gWell" cx="0.5" cy="0.45" r="0.6">
+        <stop offset="0" stop-color="#0c0e12"/>
+        <stop offset="0.85" stop-color="#16191f"/>
+        <stop offset="1" stop-color="#2a2e37"/>
+      </radialGradient>
+      <linearGradient id="gCross" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#4a505b"/>
+        <stop offset="1" stop-color="#1f2228"/>
+      </linearGradient>
+      <radialGradient id="gStop" cx="0.4" cy="0.35" r="0.75">
+        <stop offset="0" stop-color="#ff7a7a"/>
+        <stop offset="0.45" stop-color="#e02b2b"/>
+        <stop offset="1" stop-color="#7d1010"/>
+      </radialGradient>
+      <linearGradient id="gPill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3d424d"/>
+        <stop offset="1" stop-color="#1c1f25"/>
+      </linearGradient>
+      <pattern id="pGrille" width="9" height="9" patternUnits="userSpaceOnUse">
+        <circle cx="4.5" cy="4.5" r="1.8" fill="#0b0c0f"/>
+      </pattern>
+      <filter id="fBody" x="-10%" y="-10%" width="120%" height="140%">
+        <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity="0.45"/>
+      </filter>
+      <filter id="fBtn" x="-30%" y="-30%" width="160%" height="170%">
+        <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000" flood-opacity="0.6"/>
+      </filter>
+
+      <g id="ctrl-art">
+        <!-- Shoulder bumpers (behind the body) -->
+        <path d="M112 118 C140 58 215 34 300 40 L304 66 C232 62 170 82 136 124 Z" fill="url(#gBumper)"/>
+        <path d="M688 118 C660 58 585 34 500 40 L496 66 C568 62 630 82 664 124 Z" fill="url(#gBumper)"/>
+
+        <!-- Body -->
+        <path id="ctrl-shape" filter="url(#fBody)" fill="url(#gBody)" stroke="#5a6070" stroke-opacity="0.35" stroke-width="2"
+              d="M250 58 C320 44 480 44 550 58 C660 62 740 110 770 220 C792 300 790 380 740 405
+                 C700 425 655 405 628 365 L590 310 C575 292 555 285 530 285 L270 285
+                 C245 285 225 292 210 310 L172 365 C145 405 100 425 60 405
+                 C10 380 8 300 30 220 C60 110 140 62 250 58 Z"/>
+        <path fill="url(#gSheen)" d="M250 58 C320 44 480 44 550 58 C660 62 740 110 770 220 C792 300 790 380 740 405 C700 425 655 405 628 365 L590 310 C575 292 555 285 530 285 L270 285 C245 285 225 292 210 310 L172 365 C145 405 100 425 60 405 C10 380 8 300 30 220 C60 110 140 62 250 58 Z"/>
+
+        <!-- D-pad -->
+        <circle cx="215" cy="190" r="98" fill="url(#gWell)" stroke="#000" stroke-opacity="0.5" stroke-width="2"/>
+        <path filter="url(#fBtn)" fill="url(#gCross)" stroke="url(#gCross)" stroke-width="10" stroke-linejoin="round"
+              d="M190 113 H240 V165 H292 V215 H240 V267 H190 V215 H138 V165 H190 Z"/>
+        <circle cx="215" cy="190" r="15" fill="#191b21" stroke="#000" stroke-opacity="0.4"/>
+        <g fill="#8e97a8">
+          <path d="M215 122 l10 14 h-20 z"/>
+          <path d="M215 258 l10 -14 h-20 z"/>
+          <path d="M147 190 l14 -10 v20 z"/>
+          <path d="M283 190 l-14 -10 v20 z"/>
+        </g>
+
+        <!-- STOP button -->
+        <circle cx="585" cy="190" r="66" fill="url(#gWell)" stroke="#000" stroke-opacity="0.5" stroke-width="2"/>
+        <circle cx="585" cy="190" r="52" fill="url(#gStop)" filter="url(#fBtn)"/>
+        <ellipse cx="578" cy="160" rx="30" ry="14" fill="#fff" opacity="0.28"/>
+        <text x="585" y="198" text-anchor="middle" font-family="system-ui, sans-serif" font-size="21" font-weight="800"
+              fill="#fff" letter-spacing="1.5">STOP</text>
+
+        <!-- Centre: brand, link light, speed -->
+        <text x="400" y="112" text-anchor="middle" font-family="system-ui, sans-serif" font-size="18" font-weight="800"
+              fill="#6b7383" letter-spacing="5">TEMIX</text>
+        <circle cx="400" cy="140" r="9" fill="#0d0f13"/>
+        <text x="400" y="180" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700"
+              fill="#6b7383" letter-spacing="2.5">SPEED</text>
+        <rect x="338" y="185" width="124" height="18" rx="6" fill="#0d0f13"/>
+        <g fill="#1d2027">
+          <rect x="344" y="190" width="16" height="8" rx="3"/><rect x="368" y="190" width="16" height="8" rx="3"/>
+          <rect x="392" y="190" width="16" height="8" rx="3"/><rect x="416" y="190" width="16" height="8" rx="3"/>
+          <rect x="440" y="190" width="16" height="8" rx="3"/>
+        </g>
+        <rect x="318" y="220" width="56" height="24" rx="12" fill="url(#gPill)" stroke="#000" stroke-opacity="0.5" filter="url(#fBtn)"/>
+        <rect x="426" y="220" width="56" height="24" rx="12" fill="url(#gPill)" stroke="#000" stroke-opacity="0.5" filter="url(#fBtn)"/>
+        <text x="346" y="238" text-anchor="middle" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#aab2c0">−</text>
+        <text x="454" y="238" text-anchor="middle" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#aab2c0">+</text>
+
+        <!-- Speaker grille -->
+        <rect x="364" y="254" width="72" height="20" rx="8" fill="url(#pGrille)" opacity="0.9"/>
+      </g>
+    </defs>
+  </svg>
+
+  <!-- Shown when a new version has been published to GitHub -->
+  <div id="updateBar" class="update-bar" hidden>
+    <span>A new version is available.</span>
+    <button id="updateBtn" class="btn">Update</button>
+  </div>
+
+  <footer class="footer">Temix v<span id="appVersion"></span></footer>
+
+  <script src="robot.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
