@@ -1,0 +1,112 @@
+# Builds the real apps every time you push to main:
+#   - Temix.apk            (Android phone)
+#   - Temix-Setup.exe      (Windows installer)
+#   - Temix-Portable.exe   (Windows, no install needed)
+# and publishes them on the repo's Releases page under "latest".
+name: Build apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apps
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install tools
+        run: npm install
+      - name: Copy web app into www
+        run: node prepare-web.js
+      - name: Create Android project
+        run: npx cap add android
+      - name: Add Bluetooth code and permissions
+        run: node patch-android.js
+      - name: App icon
+        continue-on-error: true   # a missing icon should never block the build
+        run: >
+          npx --yes @capacitor/assets generate --android
+          --iconBackgroundColor "#0a33b8" --iconBackgroundColorDark "#0a33b8"
+          --splashBackgroundColor "#0b1020" --splashBackgroundColorDark "#0b1020"
+      - name: Sync
+        run: npx cap sync android
+      # Reuse the same signing key between builds, so a new APK installs over the old one.
+      # (GitHub drops this cache if no build runs for 7 days; then uninstall the old app once.)
+      - name: Keep signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: temix-android-debug-keystore
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Rename
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Temix.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: Temix.apk
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install tools
+        run: npm install
+      - name: Copy web app into www
+        run: node prepare-web.js
+      - name: Build Windows app
+        run: npx electron-builder --win --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/Temix-Setup.exe
+            dist/Temix-Portable.exe
+
+  release:
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Point the "latest" tag at this version
+        run: |
+          git tag -f latest
+          git push -f origin latest
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Temix (latest)
+          make_latest: true
+          body: |
+            **Android:** download `Temix.apk` on your phone and open it to install.
+            **Windows:** download `Temix-Setup.exe` (installs Temix) or `Temix-Portable.exe` (runs without installing).
+
+            Built automatically from the latest code.
+          files: out/*
