@@ -1,6 +1,6 @@
 // Service worker: makes the app work offline and lets it update itself.
 // IMPORTANT: bump VERSION every time you publish changes, so installed copies update.
-const VERSION = '0.9.0';
+const VERSION = '0.10.0';
 const CACHE = `temix-${VERSION}`;
 
 // Every file the app needs to run offline. Add new files here as you create them.

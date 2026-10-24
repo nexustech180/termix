@@ -26,6 +26,8 @@ button stops everything, and **− / +** change the speed. If the connection dro
 - Arduino Uno or Nano
 - L298N motor driver + 2 DC gear motors
 - **HC-05 or HC-06** Bluetooth module for wireless control
+- **HC-SR04** ultrasonic sensor on the front (Trig → A1, Echo → A2). While driving forward the car brakes
+  if something is closer than 40 cm and the app shows `OBSTACLE 23 cm`. Backward and turns still work.
 - Or just a USB cable from a PC. No Bluetooth module is needed for that.
 
 **Pair first:** in your phone or PC Bluetooth settings, pair with `HC-05`/`HC-06` (PIN `1234` or `0000`).

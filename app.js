@@ -155,8 +155,12 @@ async function connect(kind) {
 Robot.onLine((line) => {
   const kind = line.startsWith('ERR') ? 'error'
     : line === 'DONE' ? 'ok'
-    : line === 'STOPPED' ? 'warn' : 'robot';
+    : line === 'STOPPED' || line.startsWith('OBSTACLE') ? 'warn' : 'robot';
   print(`robot: ${line}`, kind);
+  // The ultrasonic sensor stopped the car: also show it under the controller.
+  if (line.startsWith('OBSTACLE') && currentView === 'remote') {
+    remoteNotice(`Obstacle ahead (${line.slice(9)}) - back up or turn.`);
+  }
   if (line === 'DONE' || line === 'STOPPED' || line.startsWith('ERR')) busy = false;
 });
 
