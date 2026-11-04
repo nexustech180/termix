@@ -157,9 +157,12 @@ Robot.onLine((line) => {
     : line === 'DONE' ? 'ok'
     : line === 'STOPPED' || line.startsWith('OBSTACLE') ? 'warn' : 'robot';
   print(`robot: ${line}`, kind);
-  // The ultrasonic sensor stopped the car: also show it under the controller.
+  // An ultrasonic sensor stopped the car ("OBSTACLE front 23 cm" / "OBSTACLE back 23 cm"):
+  // also show it under the controller.
   if (line.startsWith('OBSTACLE') && currentView === 'remote') {
-    remoteNotice(`Obstacle ahead (${line.slice(9)}) - back up or turn.`);
+    const behind = line.includes('back');
+    remoteNotice(`Obstacle ${behind ? 'behind' : 'ahead'} (${line.replace(/^OBSTACLE (front|back) /, '')}) - ` +
+      (behind ? 'drive forward or turn.' : 'back up or turn.'));
   }
   if (line === 'DONE' || line === 'STOPPED' || line.startsWith('ERR')) busy = false;
 });
