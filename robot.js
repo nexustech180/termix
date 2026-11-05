@@ -104,6 +104,35 @@ const Robot = (() => {
     }, 'Bluetooth');
   }
 
+  // ESP32 over WiFi: join the robot's "Temix-Robot" network first, then connect to its
+  // WebSocket at 192.168.4.1:81. Each WebSocket message is one line of text.
+  function connectWifi(host = '192.168.4.1') {
+    if (location.protocol === 'https:') {
+      return Promise.reject(new Error('WiFi only works in the Temix app (APK / EXE), not the website - browsers block it on https pages.'));
+    }
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(`ws://${host}:81/`);
+      let open = false;
+      const timer = setTimeout(() => {
+        ws.close();
+        reject(new Error(`no answer from ${host}. Join the "Temix-Robot" WiFi first (and turn off mobile data).`));
+      }, 6000);
+      ws.onopen = () => {
+        open = true;
+        clearTimeout(timer);
+        setTransport({
+          name: 'WiFi',
+          async write(text) { ws.send(text); },
+          async close() { ws.onclose = null; ws.close(); setTransport(null); },
+        });
+        resolve();
+      };
+      ws.onmessage = (e) => receive(String(e.data) + '\n');
+      ws.onerror = () => { if (!open) { clearTimeout(timer); reject(new Error(`can't reach the robot at ${host}. Join the "Temix-Robot" WiFi first (and turn off mobile data).`)); } };
+      ws.onclose = () => { if (open) setTransport(null); };
+    });
+  }
+
   function connectUsb() {
     return openSerial({}, 'USB');
   }
@@ -160,7 +189,7 @@ const Robot = (() => {
 
   return {
     parse, describeStep,
-    connectBluetooth, connectUsb, disconnect, send, stop, remote,
+    connectBluetooth, connectWifi, connectUsb, disconnect, send, stop, remote,
     supportsSerial, isNativeApp,
     // Android app only: lock/unlock landscape. Returns false when not available.
     async nativeLandscape(on) {

@@ -15,14 +15,18 @@ const permissions = [
   '<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />',
   '<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />',
   '<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />',
-  '<uses-feature android:name="android.hardware.bluetooth" android:required="true" />',
+  '<uses-feature android:name="android.hardware.bluetooth" android:required="false" />',
 ];
 
 let manifest = fs.readFileSync(manifestPath, 'utf8');
 const missing = permissions.filter((p) => !manifest.includes(p.match(/android:name="([^"]+)"/)[0]));
 if (missing.length) {
   manifest = manifest.replace('<application', missing.map((p) => '    ' + p).join('\n') + '\n\n    <application');
-  fs.writeFileSync(manifestPath, manifest);
 }
+// WiFi robot (ESP32): the app talks plain ws:// to 192.168.4.1 on the robot's own network.
+if (!manifest.includes('usesCleartextTraffic')) {
+  manifest = manifest.replace('<application', '<application android:usesCleartextTraffic="true"');
+}
+fs.writeFileSync(manifestPath, manifest);
 
 console.log('Android project patched:', missing.length, 'permission lines added');

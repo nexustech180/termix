@@ -23,19 +23,25 @@ button stops everything, and **− / +** change the speed. If the connection dro
 
 ## Robot hardware
 
-- Arduino Uno or Nano
+- **ESP32 DevKit** (ESP32-WROOM-32), which has WiFi built in, so no Bluetooth module is needed
 - L298N motor driver + 2 DC gear motors
-- **HC-05 or HC-06** Bluetooth module: TXD → RX0 (D0), RXD ← TX1 (D1) through a 1k/2k divider. **Unplug the RX0 wire while uploading.**
-- Or just a USB cable from a PC. No Bluetooth module is needed for that.
+- Wiring: ENA → GPIO 14, IN1 → 27, IN2 → 26, ENB → 32, IN3 → 25, IN4 → 33, plus a common GND
 
-**Pair first:** in your phone or PC Bluetooth settings, pair with `HC-05`/`HC-06` (PIN `1234` or `0000`).
-Then tap **Bluetooth** in Temix and pick the module.
+**Connect over WiFi:** the robot makes its own WiFi network. On your phone or PC, join **`Temix-Robot`**
+(password `temix1234`). If it says "no internet", stay connected. Then tap **WiFi** in Temix.
+If it can't connect, turn off mobile data. WiFi works in the **Android app (APK)** and **Windows app (EXE)**;
+browsers block it on the https website.
 
-Wiring is listed at the top of [`temix_robot.ino`](temix_robot.ino). Open it with the Arduino IDE (Board: Arduino Nano or Uno);
-the IDE will offer to put it in its own `temix_robot` folder, so click **OK**. Then upload it.
+**Upload the code:** open [`temix_robot.ino`](temix_robot.ino) in the Arduino IDE. You need two things, once:
+1. The board package **esp32 by Espressif Systems**: add
+   `https://espressif.github.io/arduino-esp32/package_esp32_index.json` under File → Preferences →
+   Additional boards manager URLs, then install it from Tools → Board → Boards Manager.
+2. The library **WebSockets** by Markus Sattler (Sketch → Include Library → Manage Libraries).
 
-**Calibrate:** the robot has no wheel sensors, so distance is timed. Run `F`, measure how far it went,
-and adjust `MS_PER_METER`. Run `RRRR` and adjust `MS_PER_90_DEG` until it ends facing the same way.
+Then choose Tools → Board → **ESP32 Dev Module** and upload. If it hangs on `Connecting...`, hold the **BOOT** button.
+
+**Calibrate:** the robot has no wheel sensors, so distance is timed. Run `F`, measure how far it went in cm, and set
+`MS_PER_REV_EMPTY` = old value × 100 ÷ cm. Run `RRRR` and adjust `MS_PER_90_DEG` until it ends facing the same way.
 
 ## Files
 

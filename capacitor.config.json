@@ -2,5 +2,6 @@
   "appId": "com.temix.app",
   "appName": "Temix",
   "webDir": "www",
-  "backgroundColor": "#0b1020"
+  "backgroundColor": "#0b1020",
+  "server": { "androidScheme": "http", "cleartext": true }
 }

@@ -71,6 +71,7 @@ const form = document.getElementById('prompt');
 const input = document.getElementById('cmdInput');
 const connStatus = document.getElementById('connStatus');
 const btConnect = document.getElementById('btConnect');
+const wifiConnect = document.getElementById('wifiConnect');
 const usbConnect = document.getElementById('usbConnect');
 const disconnectBtn = document.getElementById('disconnectBtn');
 
@@ -93,6 +94,7 @@ const HELP = [
   '  Example: FFFRFFFLLBB',
   '',
   '  stop        stop the robot now (or press Stop)',
+  '  wifi        connect to the ESP32 robot over WiFi',
   '  bluetooth   connect over Bluetooth',
   '  usb         connect over USB cable',
   '  disconnect  close the connection',
@@ -109,6 +111,7 @@ async function runLine(raw) {
     case 'help': HELP.forEach((l) => print(l, 'muted')); return;
     case 'clear': logEl.innerHTML = ''; return;
     case 'stop': return stopRobot();
+    case 'wifi': return connect('wifi');
     case 'bluetooth': return connect('bluetooth');
     case 'usb': return connect('usb');
     case 'disconnect': return Robot.disconnect();
@@ -121,7 +124,7 @@ async function runLine(raw) {
   drawPath(result.steps);
 
   if (!Robot.isConnected()) {
-    print(`Not connected - preview only. Connect with the ${isMobile ? 'Bluetooth' : 'Bluetooth or USB'} button.`, 'warn');
+    print(`Not connected - preview only. Connect with the ${isMobile ? 'WiFi or Bluetooth' : 'WiFi, Bluetooth or USB'} button.`, 'warn');
     return;
   }
   if (busy) { print('Robot is still moving. Wait for DONE or press Stop.', 'warn'); return; }
@@ -142,8 +145,9 @@ async function stopRobot() {
 
 async function connect(kind) {
   try {
-    print(`Connecting via ${kind === 'usb' ? 'USB' : 'Bluetooth'}…`, 'muted');
+    print(`Connecting via ${kind === 'usb' ? 'USB' : kind === 'wifi' ? 'WiFi' : 'Bluetooth'}…`, 'muted');
     if (kind === 'usb') await Robot.connectUsb();
+    else if (kind === 'wifi') await Robot.connectWifi();
     else await Robot.connectBluetooth();
   } catch (err) {
     // Closing the device picker is not an error worth shouting about.
@@ -173,6 +177,7 @@ Robot.onStatus((name) => {
   connStatus.textContent = name ? `Connected: ${name}` : 'Not connected';
   connStatus.className = `conn ${name ? 'on' : 'off'}`;
   btConnect.hidden = !!name;
+  wifiConnect.hidden = !!name;
   usbConnect.hidden = !!name || isMobile;
   disconnectBtn.hidden = !name;
   document.getElementById('linkLed').classList.toggle('on', !!name);
@@ -205,6 +210,7 @@ input.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('stopBtn').addEventListener('click', stopRobot);
+wifiConnect.addEventListener('click', () => connect('wifi'));
 btConnect.addEventListener('click', () => connect('bluetooth'));
 usbConnect.addEventListener('click', () => connect('usb'));
 disconnectBtn.addEventListener('click', () => Robot.disconnect());
@@ -250,7 +256,7 @@ document.querySelectorAll('.controller .speed-btn').forEach((btn) => {
 
 function remoteStart(dir) {
   if (remoteDir === dir) return;
-  if (!Robot.isConnected()) { remoteNotice('Not connected - tap Bluetooth (or USB) at the top first.'); return; }
+  if (!Robot.isConnected()) { remoteNotice('Not connected - tap WiFi (or Bluetooth / USB) at the top first.'); return; }
   if (busy) { remoteNotice('A terminal program is running - press STOP first.'); return; }
 
   clearInterval(remoteTimer);
