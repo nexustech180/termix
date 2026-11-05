@@ -20,7 +20,6 @@
     - Arduino Nano (or Uno)
     - L298N dual motor driver + 2 DC gear motors (left and right wheels)
     - HC-05 or HC-06 Bluetooth module (for phone / PC wireless)
-    - 2 x HC-SR04 ultrasonic sensors, one on the front and one on the back (obstacle stop)
     - USB cable also works (for PC), no Bluetooth module needed.
 
 
@@ -37,8 +36,6 @@
                                |
                               GND
     (HC-05 only: leave the EN/KEY pin unconnected so it starts in normal data mode.)
-    Front HC-SR04: VCC -> 5V   GND -> GND   Trig -> A1    Echo -> A2
-    Back  HC-SR04: VCC -> 5V   GND -> GND   Trig -> D12   Echo -> D13
     Brick switch: wire A0 to GND while carrying the brick (see CARRYING A BRICK).
 
 
@@ -62,13 +59,6 @@
     !S     stop
   The app repeats the command every 200 ms while the button is held. If nothing arrives
   for REMOTE_TIMEOUT_MS (e.g. Bluetooth dropped), the robot stops by itself.
-
-
-  OBSTACLE STOP: two ultrasonic sensors, one on the front and one on the back. While driving
-  forward the front one checks the way ahead about 20 times a second; while reversing the back
-  one does. If something is closer than OBSTACLE_CM the robot brakes and reports
-  "OBSTACLE front 23 cm" (or "back"). Driving the other way and turning still work, so you
-  can get clear. Soft things (cushions, clothes) absorb sound and may not be seen.
 
 
   TURNS pivot on one wheel: L = left wheel held still + right wheel forward,
@@ -123,17 +113,6 @@ const unsigned long PAUSE_MS = 200;        // short stop between steps (reduces 
 const unsigned long REMOTE_TIMEOUT_MS = 600;  // remote control: stop if the app goes quiet
 
 
-// ---------------- Obstacle sensors (2 x HC-SR04: front and back) ----------------
-const bool USE_FRONT_SENSOR = true;        // set to false to drive without that sensor
-const bool USE_BACK_SENSOR  = true;
-const uint8_t FRONT = 0, BACK = 1, NO_SENSOR = 255;
-const uint8_t US_TRIG[2] = { A1, 12 };     // front Trig A1, back Trig D12
-const uint8_t US_ECHO[2] = { A2, 13 };     // front Echo A2, back Echo D13
-const unsigned int OBSTACLE_CM = 40;       // stop when something is closer than this. The car
-                                           // covers ~1 m per second, so it needs room to brake.
-const unsigned long US_INTERVAL_MS = 50;   // time between distance readings
-
-
 // If a wheel spins the wrong way, flip its setting here instead of rewiring.
 const bool INVERT_LEFT  = false;
 const bool INVERT_RIGHT = false;
@@ -157,13 +136,6 @@ unsigned long lastRemoteMs = 0;
 char remoteDir = 0;                 // direction currently being driven by the remote
 int remoteLeft = 0, remoteRight = 0, remoteSpeed = 0;
 unsigned long kickUntil = 0;        // remote: full power until this time, then remoteSpeed
-
-
-// Per sensor ([FRONT] / [BACK]):
-unsigned int distanceCm[2] = { 0, 0 };      // last reading (0 = nothing in range)
-uint8_t closeReadings[2] = { 0, 0 };        // consecutive readings closer than OBSTACLE_CM
-unsigned long lastPingMs[2] = { 0, 0 };
-unsigned long lastObstacleReplyMs = 0;
 
 
 // ---------------- Messages back to the app ----------------
@@ -225,64 +197,6 @@ unsigned long msPerStep() {
 }
 
 
-// ---------------- Obstacle sensors ----------------
-bool sensorEnabled(uint8_t s) { return s == FRONT ? USE_FRONT_SENSOR : s == BACK ? USE_BACK_SENSOR : false; }
-
-
-// Which sensor guards a move: forward -> front, backward -> back, turns -> none.
-uint8_t sensorFor(char dir) { return dir == 'F' ? FRONT : dir == 'B' ? BACK : NO_SENSOR; }
-
-
-// One HC-SR04 reading in cm. 0 = nothing within ~4 m (or no sensor connected).
-unsigned int readDistanceCm(uint8_t s) {
-  digitalWrite(US_TRIG[s], LOW);
-  delayMicroseconds(2);
-  digitalWrite(US_TRIG[s], HIGH);
-  delayMicroseconds(10);
-  digitalWrite(US_TRIG[s], LOW);
-  unsigned long echoUs = pulseIn(US_ECHO[s], HIGH, 25000UL);   // gives up after ~4 m
-  return echoUs == 0 ? 0 : (unsigned int)(echoUs / 58);
-}
-
-
-// Takes a new reading every US_INTERVAL_MS. Two close readings in a row are needed, so one
-// stray echo doesn't stop the car.
-void updateDistance(uint8_t s) {
-  if (!sensorEnabled(s) || millis() - lastPingMs[s] < US_INTERVAL_MS) return;
-  lastPingMs[s] = millis();
-  distanceCm[s] = readDistanceCm(s);
-  if (distanceCm[s] > 0 && distanceCm[s] < OBSTACLE_CM) { if (closeReadings[s] < 255) closeReadings[s]++; }
-  else closeReadings[s] = 0;
-}
-
-
-// Something close in front of sensor s (NO_SENSOR -> never).
-bool obstacleAt(uint8_t s) {
-  if (s == NO_SENSOR || !sensorEnabled(s)) return false;
-  updateDistance(s);
-  return closeReadings[s] >= 2;
-}
-
-
-// Fresh check before starting a move (doesn't wait for the next reading slot).
-bool obstacleNow(uint8_t s) {
-  if (s == NO_SENSOR || !sensorEnabled(s)) return false;
-  closeReadings[s] = 0;
-  for (uint8_t i = 0; i < 2; i++) {
-    lastPingMs[s] = 0;            // force a reading now
-    updateDistance(s);
-    delay(30);                    // let the last echo die away
-  }
-  return closeReadings[s] >= 2;
-}
-
-
-void reportObstacle(uint8_t s) {
-  reply(String("OBSTACLE ") + (s == FRONT ? "front " : "back ") + distanceCm[s] + " cm");
-  lastObstacleReplyMs = millis();
-}
-
-
 // ---------------- Stop handling ----------------
 // Returns true if an 'X' (stop) arrived. Other bytes received while moving are
 // discarded - the app waits for DONE before sending the next program.
@@ -293,16 +207,11 @@ bool stopRequested() {
 }
 
 
-bool obstacleStopped = false;   // set when waitOrStop stopped because of an obstacle
-
-
-// Waits ms milliseconds while watching for a stop, and for obstacles in front of sensor
-//  watch (FRONT, BACK or NO_SENSOR). Returns false if stopped.
-bool waitOrStop(unsigned long ms, uint8_t watch) {
+// Waits ms milliseconds while watching for a stop. Returns false if stopped.
+bool waitOrStop(unsigned long ms) {
   unsigned long start = millis();
   while (millis() - start < ms) {
     if (stopRequested()) { stopMotors(); return false; }
-    if (obstacleAt(watch)) { stopMotors(); obstacleStopped = true; return false; }
   }
   return true;
 }
@@ -344,14 +253,6 @@ void runProgram(char *p) {
     while (i < n && p[i] == c) { count++; i++; }   // merge repeats: FFF -> 3 m
 
 
-    uint8_t sensor = sensorFor(c);                  // F -> front, B -> back, turns -> none
-    if (obstacleNow(sensor)) {                      // don't even start into a wall
-      reportObstacle(sensor);
-      reply("STOPPED");
-      return;
-    }
-
-
     switch (c) {
       case 'F': reply(String("STEP forward ") + count + " m"); break;
       case 'B': reply(String("STEP backward ") + count + " m"); break;
@@ -365,16 +266,14 @@ void runProgram(char *p) {
 
 
     // Kick: full power briefly so the wheels actually start turning on the floor.
-    obstacleStopped = false;
     drive(left, right, 255);
-    bool ok = waitOrStop(min(KICK_MS, duration), sensor);
+    bool ok = waitOrStop(min(KICK_MS, duration));
     if (ok && duration > KICK_MS) {
       drive(left, right, turning ? TURN_SPEED : DRIVE_SPEED);
-      ok = waitOrStop(duration - KICK_MS, sensor);
+      ok = waitOrStop(duration - KICK_MS);
     }
     stopMotors();
-    if (!ok && obstacleStopped) reportObstacle(sensor);
-    if (!ok || !waitOrStop(PAUSE_MS, NO_SENSOR)) { reply("STOPPED"); return; }
+    if (!ok || !waitOrStop(PAUSE_MS)) { reply("STOPPED"); return; }
   }
 
 
@@ -392,18 +291,6 @@ void handleRemote(const char *c) {
 
   if (dir != 'F' && dir != 'B' && dir != 'L' && dir != 'R') {   // 'S' or anything unknown
     stopMotors(); remoteActive = false; remoteDir = 0; return;
-  }
-
-
-  // Blocked in the direction of travel: refuse to move that way (the other way and turns
-  // are still allowed, so you can get clear).
-  uint8_t sensor = sensorFor(dir);
-  if (obstacleAt(sensor)) {
-    stopMotors();
-    remoteActive = false;
-    remoteDir = 0;
-    if (millis() - lastObstacleReplyMs > 1000) reportObstacle(sensor);   // don't flood the app
-    return;
   }
 
 
@@ -453,11 +340,6 @@ void setup() {
   pinMode(RIGHT_EN, OUTPUT); pinMode(RIGHT_IN1, OUTPUT); pinMode(RIGHT_IN2, OUTPUT);
   stopMotors();
   pinMode(LOAD_PIN, INPUT_PULLUP);   // unconnected = empty, wired to GND = carrying the brick
-  for (uint8_t s = FRONT; s <= BACK; s++) {
-    pinMode(US_TRIG[s], OUTPUT);
-    pinMode(US_ECHO[s], INPUT);
-    digitalWrite(US_TRIG[s], LOW);
-  }
 
 
   Serial.begin(BT_BAUD);   // RX0/TX1: HC-05 / HC-06 and USB share this port
