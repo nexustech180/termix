@@ -25,7 +25,7 @@ button stops everything, and **− / +** change the speed. If the connection dro
 
 - Arduino Uno or Nano
 - L298N motor driver + 2 DC gear motors
-- **HC-05 or HC-06** Bluetooth module for wireless control
+- **HC-05 or HC-06** Bluetooth module: TXD → RX0 (D0), RXD ← TX1 (D1) through a 1k/2k divider. **Unplug the RX0 wire while uploading.**
 - **2 × HC-SR04** ultrasonic sensors: front (Trig → A1, Echo → A2) and back (Trig → D12, Echo → D13).
   Driving forward, the front one brakes the car if something is closer than 40 cm; reversing, the back one does.
   The app shows `OBSTACLE front 23 cm` or `OBSTACLE back 23 cm`. Driving the other way and turning still work.
@@ -34,7 +34,7 @@ button stops everything, and **− / +** change the speed. If the connection dro
 **Pair first:** in your phone or PC Bluetooth settings, pair with `HC-05`/`HC-06` (PIN `1234` or `0000`).
 Then tap **Bluetooth** in Temix and pick the module.
 
-Wiring is listed at the top of [`temix_robot.ino`](temix_robot.ino). Open it with the Arduino IDE (Board: Arduino Uno);
+Wiring is listed at the top of [`temix_robot.ino`](temix_robot.ino). Open it with the Arduino IDE (Board: Arduino Nano or Uno);
 the IDE will offer to put it in its own `temix_robot` folder, so click **OK**. Then upload it.
 
 **Calibrate:** the robot has no wheel sensors, so distance is timed. Run `F`, measure how far it went,
