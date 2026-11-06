@@ -23,9 +23,10 @@ button stops everything, and **− / +** change the speed. If the connection dro
 
 ## Robot hardware
 
-- **ESP32 DevKit** (ESP32-WROOM-32), which has WiFi built in, so no Bluetooth module is needed
+- **ESP8266** board (NodeMCU / Wemos D1 / "ESP8266MOD"), which has WiFi built in, so no Bluetooth module is needed
 - L298N motor driver + 2 DC gear motors
-- Wiring: ENA → GPIO 14, IN1 → 27, IN2 → 26, ENB → 32, IN3 → 25, IN4 → 33, plus a common GND
+- Wiring (labels printed on the board): ENA → D1, IN1 → D5, IN2 → D6, ENB → D2, IN3 → D7, IN4 → D0, plus a common GND
+- Using an ESP32 instead? Use [`temix_esp32.ino`](temix_esp32.ino) (ENA 14, IN1 27, IN2 26, ENB 32, IN3 25, IN4 33).
 
 **Connect over WiFi:** the robot makes its own WiFi network. On your phone or PC, join **`Temix-Robot`**
 (password `temix1234`). If it says "no internet", stay connected. Then tap **WiFi** in Temix.
@@ -33,12 +34,13 @@ If it can't connect, turn off mobile data. WiFi works in the **Android app (APK)
 browsers block it on the https website.
 
 **Upload the code:** open [`temix_robot.ino`](temix_robot.ino) in the Arduino IDE. You need two things, once:
-1. The board package **esp32 by Espressif Systems**: add
-   `https://espressif.github.io/arduino-esp32/package_esp32_index.json` under File → Preferences →
+1. The board package **esp8266 by ESP8266 Community**: add
+   `http://arduino.esp8266.com/stable/package_esp8266com_index.json` under File → Preferences →
    Additional boards manager URLs, then install it from Tools → Board → Boards Manager.
 2. The library **WebSockets** by Markus Sattler (Sketch → Include Library → Manage Libraries).
 
-Then choose Tools → Board → **ESP32 Dev Module** and upload. If it hangs on `Connecting...`, hold the **BOOT** button.
+Then choose Tools → Board → **NodeMCU 1.0 (ESP-12E Module)** and upload.
+(For the ESP32 file, install **esp32 by Espressif Systems** and choose **ESP32 Dev Module**; hold **BOOT** if it hangs on `Connecting...`.)
 
 **Calibrate:** the robot has no wheel sensors, so distance is timed. Run `F`, measure how far it went in cm, and set
 `MS_PER_REV_EMPTY` = old value × 100 ÷ cm. Run `RRRR` and adjust `MS_PER_90_DEG` until it ends facing the same way.
@@ -53,7 +55,8 @@ Everything is in one folder, except the two GitHub workflow files, which GitHub 
 | `robot.js` | Command parser + Bluetooth/USB connection to the robot |
 | `manifest.webmanifest`, `sw.js` | Makes the web version installable and work offline |
 | `*.png` | App icons |
-| `temix_robot.ino` | Arduino code for the robot |
+| `temix_robot.ino` | Robot code for ESP8266 boards (WiFi) |
+| `temix_esp32.ino` | Same robot code for ESP32 boards |
 | `TemixNativePlugin.java`, `MainActivity.java` | Android app: Bluetooth and landscape lock |
 | `electron-main.js` | Windows app: window + port picker |
 | `package.json`, `capacitor.config.json`, `prepare-web.js`, `patch-android.js`, `.gitignore` | Build settings for the APK/EXE |

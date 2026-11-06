@@ -1,6 +1,6 @@
 /*
-  Temix Robot - ESP32 firmware (WiFi)
-  -----------------------------------
+  Temix Robot - ESP8266 firmware (WiFi)   [NodeMCU / Wemos D1 / "ESP8266MOD" boards]
+  ----------------------------------------------------------------------------------
   Receives a command string from the Temix app over WiFi (or the USB cable) and drives the robot.
 
 
@@ -13,7 +13,7 @@
     forward 3 m -> right 90 -> forward 3 m -> left 180 -> backward 2 m
 
 
-  WIFI: the ESP32 makes its own WiFi network - no router needed.
+  WIFI: the ESP8266 makes its own WiFi network - no router needed.
     1. On the phone / PC, join the WiFi network  "Temix-Robot"  (password  temix1234 ).
        The phone may say "no internet" - choose to stay connected.
        If the app can't connect, turn OFF mobile data while driving.
@@ -24,32 +24,27 @@
 
   ONE-TIME SETUP in the Arduino IDE:
     - Boards: File -> Preferences -> Additional boards manager URLs, add
-        https://espressif.github.io/arduino-esp32/package_esp32_index.json
-      then Tools -> Board -> Boards Manager, install "esp32 by Espressif Systems".
-    - Board: Tools -> Board -> esp32 -> "ESP32 Dev Module".
+        http://arduino.esp8266.com/stable/package_esp8266com_index.json
+      then Tools -> Board -> Boards Manager, install "esp8266 by ESP8266 Community".
+    - Board: Tools -> Board -> esp8266 -> "NodeMCU 1.0 (ESP-12E Module)"
+      (for a Wemos D1 mini choose "LOLIN(WEMOS) D1 R2 & mini").
     - Library: Sketch -> Include Library -> Manage Libraries, install
         "WebSockets" by Markus Sattler.
-    - Uploading: if it says "Connecting......" for a long time, hold the BOOT button
-      on the board until the upload starts.
+    - Serial Monitor: 115200 baud.
 
 
-  Hardware:
-    - ESP32 DevKit (ESP32-WROOM-32 / "ESP32 Dev Module")
-    - L298N dual motor driver + 2 DC gear motors (left and right wheels)
+  Wiring (the labels D1, D2... are printed on the board; GPIO numbers are in brackets):
+    L298N ENA -> D1 (GPIO5)     L298N IN1 -> D5 (GPIO14)    L298N IN2 -> D6 (GPIO12)   (left motor)
+    L298N ENB -> D2 (GPIO4)     L298N IN3 -> D7 (GPIO13)    L298N IN4 -> D0 (GPIO16)   (right motor)
+    L298N GND -> ESP8266 GND (common ground is required!)
+    Power the ESP8266 from the L298N "5V" pin -> board "VIN" pin, or by USB.
+    Remove the ENA and ENB jumpers on the L298N, so D1 and D2 control the speed.
+    (The ESP8266's 3.3 V signals are fine for the L298N inputs - no level shifting needed.)
+    Don't use D3, D4 or D8 for the motors: they decide how the board starts up.
 
 
-  Wiring:
-    L298N ENA -> GPIO 14    L298N IN1 -> GPIO 27    L298N IN2 -> GPIO 26   (left motor)
-    L298N ENB -> GPIO 32    L298N IN3 -> GPIO 25    L298N IN4 -> GPIO 33   (right motor)
-    L298N GND -> ESP32 GND (common ground is required!)
-    Power the ESP32 from the L298N "5V" pin -> ESP32 "VIN" (or "5V") pin, or by USB.
-    Brick switch: wire GPIO 4 to GND while carrying the brick (see CARRYING A BRICK).
-    (The ESP32's 3.3 V signals are fine for the L298N inputs - no level shifting needed.)
-
-
-  If the ESP32 keeps restarting when the motors start ("Brownout detector was triggered" in the
-  Serial Monitor), the battery is too weak: use fresh / stronger cells (2-3 x 18650 is best) and
-  put a 470-1000 uF capacitor across the battery terminals.
+  If the board keeps restarting when the motors start, the battery is too weak: use fresh /
+  stronger cells (2-3 x 18650 is best) and put a 470-1000 uF capacitor across the battery.
 
 
   REMOTE CONTROL: lines starting with '!' drive the robot directly while a button is held:
@@ -71,21 +66,21 @@
 
 
   CARRYING A BRICK: a load slows the motors, so there is a second revolution time for it.
-    Put a wire (or a small switch) from GPIO 4 to GND when the brick is on the car.
-    No wire = empty. The robot says which one it is using when it starts ("READY ... empty").
+    This board has no spare pin for a switch, so set CARRYING_BRICK below to true
+    when the brick is on the car (and upload again).
 
 
   CALIBRATION: the robot has no wheel sensors, so distance and angle are timed.
     1. Straight: send "F". If it drifts sideways, adjust LEFT_TRIM / RIGHT_TRIM.
     2. Distance (empty): send "F", measure how far it went in cm, then
          new MS_PER_REV_EMPTY = old MS_PER_REV_EMPTY x 100 / cm travelled
-    3. Distance (with the brick, GPIO 4 wired to GND): same, for MS_PER_REV_LOADED.
+    3. Distance (with the brick, CARRYING_BRICK = true): same, for MS_PER_REV_LOADED.
     4. Turns: send "RRRR" and adjust MS_PER_90_DEG until it ends facing the way it started
        (turned too far -> smaller number, not far enough -> bigger).
 */
 
 
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 #include <WebSocketsServer.h>   // "WebSockets" library by Markus Sattler
 
 
@@ -104,7 +99,7 @@ const float STEP_CM = 100.0;               // distance of one F or B (the app's 
 const unsigned long MS_PER_REV_EMPTY  = 655;  // one wheel revolution at DRIVE_SPEED, no load
                                               // (measured: 1 m = 1.59 rev in 1042 ms -> 655)
 const unsigned long MS_PER_REV_LOADED = 655;  // same, carrying the brick - measure and change
-const uint8_t LOAD_PIN = 4;                // wire GPIO 4 to GND when carrying the brick
+const bool CARRYING_BRICK = false;         // set to true when the brick is on the car
 const unsigned long MS_PER_90_DEG = 1000;  // time to turn 90 degrees at TURN_SPEED (one wheel
                                            // stopped, the other driving forward)
 const uint8_t DRIVE_SPEED = 200;           // 0-255 motor power when driving
@@ -127,9 +122,9 @@ const bool INVERT_LEFT  = false;
 const bool INVERT_RIGHT = false;
 
 
-// ---------------- Pins ----------------
-const uint8_t LEFT_EN = 14, LEFT_IN1 = 27, LEFT_IN2 = 26;    // L298N ENA, IN1, IN2
-const uint8_t RIGHT_EN = 32, RIGHT_IN1 = 25, RIGHT_IN2 = 33; // L298N ENB, IN3, IN4
+// ---------------- Pins (GPIO numbers) ----------------
+const uint8_t LEFT_EN = 5,  LEFT_IN1 = 14, LEFT_IN2 = 12;    // D1, D5, D6  = ENA, IN1, IN2
+const uint8_t RIGHT_EN = 4, RIGHT_IN1 = 13, RIGHT_IN2 = 16;  // D2, D7, D0  = ENB, IN3, IN4
 
 
 WebSocketsServer ws(WS_PORT);
@@ -202,7 +197,7 @@ void wheelsFor(char c, int &left, int &right) {
 
 
 // ---------------- Distance ----------------
-bool carryingLoad() { return digitalRead(LOAD_PIN) == LOW; }   // GPIO 4 wired to GND = brick on
+bool carryingLoad() { return CARRYING_BRICK; }
 
 
 // Milliseconds to drive one F / B step, from wheel revolutions.
@@ -261,7 +256,7 @@ bool waitOrStop(unsigned long ms) {
   unsigned long start = millis();
   while (millis() - start < ms) {
     if (stopRequested()) { stopMotors(); return false; }
-    delay(1);
+    delay(1);                        // also lets the ESP8266 handle WiFi
   }
   return true;
 }
@@ -384,10 +379,10 @@ void feed(char c) {
 
 
 void setup() {
+  analogWriteRange(255);             // ESP8266 default is 0-1023; the code uses 0-255
   pinMode(LEFT_EN, OUTPUT);  pinMode(LEFT_IN1, OUTPUT);  pinMode(LEFT_IN2, OUTPUT);
   pinMode(RIGHT_EN, OUTPUT); pinMode(RIGHT_IN1, OUTPUT); pinMode(RIGHT_IN2, OUTPUT);
   stopMotors();
-  pinMode(LOAD_PIN, INPUT_PULLUP);   // unconnected = empty, wired to GND = carrying the brick
 
 
   Serial.begin(115200);              // USB (Serial Monitor at 115200)
@@ -395,11 +390,12 @@ void setup() {
 
   WiFi.mode(WIFI_AP);
   WiFi.softAP(WIFI_NAME, WIFI_PASSWORD);
-  WiFi.setSleep(false);              // no WiFi power saving: faster, steadier replies
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);   // no WiFi power saving: faster, steadier replies
   ws.begin();
   ws.onEvent(onWebSocket);
 
 
+  Serial.println();
   reply(readyMessage());
   Serial.print("WiFi: join \""); Serial.print(WIFI_NAME);
   Serial.print("\", then tap WiFi in the app (robot address ");
