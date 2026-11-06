@@ -118,7 +118,7 @@ const unsigned long REMOTE_TIMEOUT_MS = 600;  // remote control: stop if the app
 
 
 // If a wheel spins the wrong way, flip its setting here instead of rewiring.
-const bool INVERT_LEFT  = false;
+const bool INVERT_LEFT  = true;
 const bool INVERT_RIGHT = false;
 
 
